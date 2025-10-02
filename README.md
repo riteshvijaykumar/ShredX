@@ -17,6 +17,26 @@ HDD Tool is a **cross-platform** enterprise-grade data sanitization tool that fu
 | **Linux** | ✅ x64, ARM64 | ✅ x64, ARM64 | Full Support |
 | **macOS** | ✅ Intel, Apple Silicon | ✅ Intel, Apple Silicon | Full Support |
 
+## 📦 Download Latest Release
+
+### 🪟 Windows (v1.0.0) - **Available Now!**
+[![Download Windows](https://img.shields.io/badge/Download-Windows%20x64-blue?style=for-the-badge&logo=windows)](https://github.com/riteshvijaykumar/HDD-Tool/releases/latest/download/ShredX-v1.0.0-Windows-x64.zip)
+
+- **Requirements**: Windows 10/11, Administrator privileges
+- **Size**: 3.46 MB
+- **Installation**: Extract and run `install.bat` as Administrator
+- **Features**: Complete NIST SP 800-88 compliance, modern UI, certificate generation
+
+### 🐧 Linux (Coming Soon)
+- Ubuntu, Debian, CentOS packages
+- AppImage for universal compatibility
+- Complete server deployment scripts
+
+### 🍎 macOS (Coming Soon)
+- Intel and Apple Silicon support
+- DMG installer with code signing
+- Full macOS integration
+
 ## 🏗️ Quick Workflow Summary
 
 ```
