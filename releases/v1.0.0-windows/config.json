@@ -1,0 +1,39 @@
+{
+  "app_name": "ShredX",
+  "version": "1.0.0",
+  "theme": "Dark",
+  "language": "en-US",
+  "auto_save_reports": true,
+  "verification_enabled": true,
+  "buffer_size_mb": 16,
+  "thread_count": 4,
+  "default_algorithm": "NIST_Clear",
+  "server": {
+    "enabled": false,
+    "url": "http://localhost:3030",
+    "auto_sync": false,
+    "timeout_seconds": 30
+  },
+  "reports": {
+    "output_directory": "./reports",
+    "auto_generate_pdf": true,
+    "include_device_info": true,
+    "include_verification_details": true
+  },
+  "security": {
+    "require_confirmation": true,
+    "session_timeout_minutes": 30,
+    "max_login_attempts": 3
+  },
+  "ui": {
+    "auto_detect_devices": true,
+    "show_progress_details": true,
+    "confirm_destructive_operations": true,
+    "dark_theme": true
+  },
+  "logging": {
+    "level": "info",
+    "max_log_files": 10,
+    "max_log_size_mb": 50
+  }
+}
