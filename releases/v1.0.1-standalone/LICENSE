@@ -1,0 +1,48 @@
+MIT License
+
+Copyright (c) 2024 ShredX Project
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ADDITIONAL DISCLAIMERS:
+
+Data Destruction Warning:
+This software is designed to permanently and irreversibly destroy data.
+Users assume full responsibility for data loss resulting from the use of
+this software. Always verify target devices and backup important data
+before using sanitization functions.
+
+Security Compliance:
+While this software is designed to meet industry standards including
+NIST SP 800-88, users are responsible for validating compliance with
+their specific security requirements and applicable regulations.
+
+Administrator Privileges:
+This software requires administrator privileges for low-level disk access.
+Users should understand the security implications of running software
+with elevated privileges.
+
+Export Controls:
+Cryptographic sanitization methods may be subject to export controls.
+Users are responsible for compliance with applicable export regulations.
+
+Professional Use:
+For enterprise and government deployments, professional validation and
+certification services are recommended to ensure compliance with specific
+organizational security requirements.

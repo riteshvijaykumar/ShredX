@@ -1,0 +1,39 @@
+{
+  "app_name": "ShredX",
+  "version": "1.0.1",
+  "debug_mode": false,
+  "logging": {
+    "level": "info",
+    "file_enabled": true,
+    "console_enabled": false
+  },
+  "security": {
+    "require_admin_privileges": true,
+    "enable_audit_logging": true,
+    "certificate_validation": true
+  },
+  "sanitization": {
+    "default_algorithm": "NIST_Clear",
+    "verification_enabled": true,
+    "buffer_size_mb": 64,
+    "parallel_processing": true,
+    "max_threads": 4
+  },
+  "ui": {
+    "theme": "secure_dark",
+    "auto_save_settings": true,
+    "show_advanced_options": false,
+    "confirm_dangerous_operations": true
+  },
+  "reporting": {
+    "auto_generate_certificates": true,
+    "include_device_details": true,
+    "compliance_format": "NIST_SP_800_88",
+    "export_formats": ["PDF", "JSON"]
+  },
+  "performance": {
+    "use_direct_io": true,
+    "cache_device_info": true,
+    "optimize_for_ssd": true
+  }
+}
