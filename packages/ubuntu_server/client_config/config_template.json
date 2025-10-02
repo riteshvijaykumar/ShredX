@@ -1,0 +1,35 @@
+{
+  "server_config": {
+    "is_server_enabled": true,
+    "server_url": "http://YOUR_SERVER_IP_HERE",
+    "api_base_url": "http://YOUR_SERVER_IP_HERE/api",
+    "enable_server_sync": true,
+    "connection_timeout": 30,
+    "retry_attempts": 3,
+    "auto_upload_certificates": true,
+    "local_storage_only": false
+  },
+  "client_config": {
+    "app_name": "HDD Tool Client",
+    "version": "1.0.0",
+    "auto_connect": true,
+    "cache_server_data": true,
+    "offline_mode_fallback": true
+  },
+  "authentication": {
+    "method": "server",
+    "auto_login": false,
+    "remember_credentials": false,
+    "session_timeout": 1440
+  },
+  "network": {
+    "ping_interval": 30,
+    "health_check_url": "/api/health",
+    "connection_retry_delay": 5
+  },
+  "ui": {
+    "show_server_status": true,
+    "enable_real_time_sync": true,
+    "theme": "default"
+  }
+}

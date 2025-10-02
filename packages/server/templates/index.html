@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-hdd"></i> HDD Tool Server
+            </a>
+            <div class="navbar-nav ms-auto">
+                <div id="auth-section">
+                    <button class="btn btn-outline-light" onclick="showLoginModal()">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Main Dashboard -->
+        <div id="dashboard" style="display: none;">
+            <div class="row">
+                <div class="col-md-12">
+                    <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
+                </div>
+            </div>
+
+            <!-- Drive Management -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-hard-drive"></i> Available Drives</h5>
+                            <button class="btn btn-primary btn-sm float-end" onclick="scanDrives()">
+                                <i class="fas fa-sync-alt"></i> Scan Drives
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="drives-list">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Loading drives...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sanitization Controls -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-trash-alt"></i> Sanitization Options</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="sanitization-form">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Sanitization Method</label>
+                                            <select class="form-select" id="sanitization-method">
+                                                <option value="zeros">Zero Fill</option>
+                                                <option value="random">Random Data</option>
+                                                <option value="dod">DoD 5220.22-M</option>
+                                                <option value="gutmann">Gutmann (35 passes)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Number of Passes</label>
+                                            <input type="number" class="form-control" id="passes" value="1" min="1" max="35">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="mb-3">
+                                            <label class="form-label">Verification</label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="verify">
+                                                <label class="form-check-label" for="verify">
+                                                    Verify after sanitization
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="confirm-erase" required>
+                                        <label class="form-check-label text-danger" for="confirm-erase">
+                                            <strong>⚠️ I understand that this action will permanently destroy all data on the selected drives</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-danger" id="start-sanitization" disabled>
+                                    <i class="fas fa-play"></i> Start Sanitization
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Job Status -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-tasks"></i> Sanitization Jobs</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="jobs-list">
+                                <p class="text-muted">No active jobs</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login-screen">
+            <div class="row justify-content-center">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header text-center">
+                            <h4><i class="fas fa-shield-alt"></i> HDD Tool Server Login</h4>
+                        </div>
+                        <div class="card-body">
+                            <form id="login-form">
+                                <div class="mb-3">
+                                    <label class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="password" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-sign-in-alt"></i> Login
+                                </button>
+                            </form>
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    Default credentials:<br>
+                                    Admin: admin / admin123<br>
+                                    User: user / user123
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Login</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="modal-login-form">
+                        <div class="mb-3">
+                            <label class="form-label">Username</label>
+                            <input type="text" class="form-control" id="modal-username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" id="modal-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

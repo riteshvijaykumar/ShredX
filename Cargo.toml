@@ -21,15 +21,16 @@ ring = "0.17"
 x509-parser = "0.15"
 webbrowser = "0.8"
 
-# Server and Database dependencies (optional)
-tokio = { version = "1.0", features = ["full"], optional = true }
+# Server and Database dependencies
+tokio = { version = "1.0", features = ["full"] }
 warp = { version = "0.3", optional = true }
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"], optional = true }
-reqwest = { version = "0.11", features = ["json"], optional = true }
+reqwest = { version = "0.11", features = ["json"] }
+jsonwebtoken = "9.0"
 
 [features]
 default = []
-server = ["tokio", "warp", "sqlx", "reqwest"]
+server = ["warp", "sqlx"]
 
 # Platform-specific dependencies
 [target.'cfg(windows)'.dependencies]
@@ -66,7 +67,8 @@ name = "hdd-tool-server"
 path = "src/bin/server.rs"
 required-features = ["server"]
 
+
+
 [[bin]]
 name = "hdd-tool"
 path = "src/main.rs"
-deb_depends = ["hdparm", "util-linux"]

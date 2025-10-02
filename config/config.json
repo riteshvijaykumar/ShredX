@@ -1,0 +1,11 @@
+{
+  "server_url": "http://10.0.43.207:3000",
+  "enable_server": false,
+  "enable_server_sync": false,  
+  "auto_upload_certificates": false,
+  "local_cert_storage": "./certificates",
+  "local_storage_only": true,
+  "connection_timeout_seconds": 30,
+  "retry_attempts": 3,
+  "debug_mode": false
+}

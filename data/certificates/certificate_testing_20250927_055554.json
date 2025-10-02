@@ -1,0 +1,54 @@
+{
+  "id": "8fed9e5e-acc7-4da6-ad59-035eb2de29b6",
+  "device_info": {
+    "device_path": "T:\\",
+    "device_name": "testing",
+    "device_type": "Fixed Drive (HDD/SSD)",
+    "manufacturer": "Unknown",
+    "model": "Unknown",
+    "serial_number": "N/A",
+    "capacity": 10736365568,
+    "sector_size": 512,
+    "supports_secure_erase": false,
+    "supports_crypto_erase": false,
+    "encryption_status": "Unknown"
+  },
+  "sanitization_info": {
+    "method": "NIST SP 800-88 and DoD 5220.22-M",
+    "algorithm": "NistClear",
+    "passes_completed": 1,
+    "total_bytes_processed": 10736365568,
+    "start_time": "2025-09-27T05:55:15.662384300Z",
+    "end_time": "2025-09-27T05:55:54.073456200Z",
+    "duration_seconds": 38,
+    "average_speed_mbps": 269.447265625,
+    "success": true,
+    "error_count": 0
+  },
+  "compliance_info": {
+    "standards_met": [
+      "NIST SP 800-88",
+      "DoD 5220.22-M"
+    ],
+    "nist_compliant": true,
+    "dod_compliant": true,
+    "hipaa_compliant": true,
+    "gdpr_compliant": true,
+    "security_level": "High Security"
+  },
+  "verification_info": {
+    "verification_performed": true,
+    "verification_method": "Post-sanitization sector scan",
+    "verification_passed": true,
+    "residual_data_found": false,
+    "verification_details": "No recoverable data detected after sanitization"
+  },
+  "timestamp": "2025-09-27T05:55:54.073504300Z",
+  "user_info": {
+    "username": "admin",
+    "user_id": "786e4e3d-0abf-4057-ab2e-c539d73ddc88",
+    "organization": "HDD Tool User",
+    "role": "User"
+  },
+  "certificate_hash": "fa458a23b16358fa42bffcbc5a8cb322a64a3bd165d04128ed348b3e1eeee95d"
+}

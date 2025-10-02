@@ -1,0 +1,81 @@
+[package]
+name = "hdd-tool-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["SIH Team"]
+description = "HDD Tool Web Server - NIST SP 800-88 compliant disk sanitization server"
+license = "MIT"
+homepage = "https://github.com/riteshvijaykumar/HDD-Tool"
+repository = "https://github.com/riteshvijaykumar/HDD-Tool"
+keywords = ["disk", "sanitization", "nist", "security", "server"]
+categories = ["command-line-utilities", "web-programming::http-server"]
+
+[[bin]]
+name = "hdd-tool-server"
+path = "src/main.rs"
+
+[dependencies]
+# Web framework
+tokio = { version = "1.40", features = ["full"] }
+warp = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "migrate"] }
+
+# Authentication & Security
+jsonwebtoken = "9.0"
+bcrypt = "0.15"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+ring = "0.17"
+base64 = "0.22"
+
+# Time and utilities
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Configuration
+config = "0.14"
+dotenv = "0.15"
+
+# HTTP client for external APIs
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# File handling and I/O
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = "0.3"
+
+# Disk operations (Linux specific)
+nix = "0.29"
+libc = "0.2"
+sysinfo = "0.30"
+
+# Sanitization algorithms
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+
+# JSON Web handling
+headers = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true

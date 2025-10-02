@@ -1,0 +1,12 @@
+{
+  "admin": {
+    "id": "786e4e3d-0abf-4057-ab2e-c539d73ddc88",
+    "username": "admin",
+    "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "email": "admin@hddtool.local",
+    "role": "Admin",
+    "created_at": "2025-09-27T05:12:31.006913700Z",
+    "last_login": "2025-09-27T06:56:53.995350Z",
+    "is_active": true
+  }
+}

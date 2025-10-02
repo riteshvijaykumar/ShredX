@@ -1,0 +1,14 @@
+SHREDX - Sanitization Report
+Generated: 2025-09-27 12:27:44
+Erasure Method: NIST SP 800-88 and DoD 5220.22-M
+Verification: json
+
+=== SANITIZED DRIVES ===
+✅ testing (T:\): Complete
+   Size: 10.00 GB
+   Status: Complete
+
+=== COMPLIANCE ===
+This sanitization process complies with:
+- NIST SP 800-88 Guidelines
+- DoD 5220.22-M Standards

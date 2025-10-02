@@ -418,6 +418,8 @@ impl AdvancedOptionsWidget {
     }
     
     pub fn show_with_permissions(&mut self, ui: &mut egui::Ui, can_sanitize: bool, user_role: &str) -> bool {
+        println!("🔐 AUTH STATUS: can_sanitize={}, user_role={}", can_sanitize, user_role);
+        
         ui.horizontal(|ui| {
             ui.label("ADVANCE OPTIONS");
         });
@@ -463,29 +465,21 @@ impl AdvancedOptionsWidget {
             
             ui.add_space(10.0);
             
-            // Show permission warning if user cannot sanitize
-            if !can_sanitize {
-                ui.label(egui::RichText::new(format!("🚫 {} role cannot perform sanitization", user_role))
-                    .color(egui::Color32::from_rgb(239, 68, 68))
-                    .size(14.0));
-                ui.add_space(5.0);
-            }
-            
             let can_erase = self.confirm_erase && can_sanitize;
+            println!("🔧 ERASE STATUS: confirm_erase={}, can_sanitize={}, can_erase={}", 
+                    self.confirm_erase, can_sanitize, can_erase);
+            
             let erase_button = egui::Button::new("ERASE")
                 .fill(if can_erase { SecureTheme::DANGER_RED } else { egui::Color32::GRAY })
                 .min_size(egui::vec2(120.0, 40.0));
                 
             let mut erase_clicked = false;
             if ui.add_enabled(can_erase, erase_button).clicked() {
+                println!("🚨 ERASE BUTTON CLICKED!");
                 erase_clicked = true;
             }
             
-            if !can_sanitize {
-                ui.label(egui::RichText::new("⚠ Contact Administrator for sanitization permissions")
-                    .color(egui::Color32::YELLOW)
-                    .size(12.0));
-            } else if !self.confirm_erase {
+            if !self.confirm_erase {
                 ui.label(egui::RichText::new("⚠ Please confirm to enable erase")
                     .color(egui::Color32::YELLOW)
                     .size(12.0));

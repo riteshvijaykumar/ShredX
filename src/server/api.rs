@@ -1,7 +1,8 @@
-use warp::Filter;
+use warp::{Filter, Reply};
 use std::sync::Arc;
 use uuid::Uuid;
 use crate::server::{DatabaseManager, models::*};
+use sha2::{Sha256, Digest};
 
 pub async fn start_server(database_url: String, port: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let db = Arc::new(DatabaseManager::new(&database_url).await?);
@@ -12,8 +13,14 @@ pub async fn start_server(database_url: String, port: u16) -> Result<(), Box<dyn
         .allow_headers(vec!["content-type", "authorization"])
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE"]);
     
+    // Static files route for dashboard
+    let dashboard = warp::path::end()
+        .and(warp::get())
+        .and_then(serve_dashboard);
+
     // Routes
     let register = warp::path("api")
+        .and(warp::path("auth"))
         .and(warp::path("register"))
         .and(warp::post())
         .and(warp::body::json())
@@ -21,6 +28,7 @@ pub async fn start_server(database_url: String, port: u16) -> Result<(), Box<dyn
         .and_then(register_user);
     
     let login = warp::path("api")
+        .and(warp::path("auth"))
         .and(warp::path("login"))
         .and(warp::post())
         .and(warp::body::json())
@@ -51,25 +59,33 @@ pub async fn start_server(database_url: String, port: u16) -> Result<(), Box<dyn
         .and(with_db(db.clone()))
         .and_then(get_sanitization_logs);
     
-    // Static files for web dashboard
-    let static_files = warp::path("dashboard")
-        .and(warp::fs::dir("web/"));
+    // Certificate download route
+    let download_cert = warp::path("api")
+        .and(warp::path("certificates"))
+        .and(warp::path::param::<Uuid>())
+        .and(warp::path("download"))
+        .and(warp::get())
+        .and(warp::header::<String>("authorization"))
+        .and(with_db(db.clone()))
+        .and_then(download_certificate);
     
-    let routes = register
+    let routes = dashboard
+        .or(register)
         .or(login)
         .or(submit_cert)
         .or(get_certs)
+        .or(download_cert)
         .or(get_logs)
-        .or(static_files)
         .with(cors);
     
     println!("🚀 HDD Tool Server starting on port {}", port);
-    println!("📊 Dashboard available at: http://localhost:{}/dashboard", port);
+    println!("📊 Dashboard available at: http://localhost:{}/", port);
     println!("🔗 API endpoints:");
-    println!("   POST /api/register - Create user account");
-    println!("   POST /api/login - User login");
+    println!("   POST /api/auth/register - Create user account");
+    println!("   POST /api/auth/login - User login");
     println!("   POST /api/certificates - Submit certificate");
     println!("   GET  /api/certificates - Get user certificates");
+    println!("   GET  /api/certificates/:id/download - Download certificate");
     println!("   GET  /api/logs - Get sanitization logs");
     
     warp::serve(routes)
@@ -153,7 +169,15 @@ async fn submit_certificate(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match extract_user_id(&auth_header) {
         Ok(user_id) => {
-            match db.store_certificate(user_id, req).await {
+            let file_hash = format!("{:x}", Sha256::digest(req.certificate_data.as_bytes()));
+            let store_req = StoreCertificateRequest {
+                user_id,
+                certificate_data: req.certificate_data,
+                device_info: req.device_info,
+                sanitization_method: req.sanitization_method,
+                file_hash,
+            };
+            match db.store_certificate(store_req).await {
                 Ok(certificate) => {
                     let response = ApiResponse::success(certificate);
                     Ok(warp::reply::json(&response))
@@ -203,7 +227,7 @@ async fn get_sanitization_logs(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match extract_user_id(&auth_header) {
         Ok(user_id) => {
-            match db.get_user_logs(user_id, query.limit, query.offset).await {
+            match db.get_sanitization_logs(user_id, query.limit, query.offset).await {
                 Ok(logs) => {
                     let response = ApiResponse::success(logs);
                     Ok(warp::reply::json(&response))
@@ -217,6 +241,55 @@ async fn get_sanitization_logs(
         Err(e) => {
             let response: ApiResponse<()> = ApiResponse::error(e);
             Ok(warp::reply::json(&response))
+        }
+    }
+}
+
+async fn serve_dashboard() -> Result<impl warp::Reply, warp::Rejection> {
+    let dashboard_html = include_str!("dashboard.html");
+    Ok(warp::reply::html(dashboard_html))
+}
+
+async fn download_certificate(
+    cert_id: Uuid,
+    auth_header: String,
+    db: Arc<DatabaseManager>,
+) -> Result<Box<dyn warp::Reply>, warp::Rejection> {
+    match extract_user_id(&auth_header) {
+        Ok(user_id) => {
+            match db.get_certificate_by_id(cert_id, user_id).await {
+                Ok(Some(certificate)) => {
+                    let filename = format!("certificate_{}.json", cert_id);
+                    
+                    Ok(Box::new(warp::reply::with_header(
+                        warp::reply::with_header(
+                            certificate.certificate_data,
+                            "content-disposition",
+                            format!("attachment; filename={}", filename)
+                        ),
+                        "content-type",
+                        "application/json"
+                    )))
+                }
+                Ok(None) => {
+                    Ok(Box::new(warp::reply::with_status(
+                        "Certificate not found".to_string(),
+                        warp::http::StatusCode::NOT_FOUND
+                    )))
+                }
+                Err(e) => {
+                    Ok(Box::new(warp::reply::with_status(
+                        format!("Database error: {}", e),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR
+                    )))
+                }
+            }
+        }
+        Err(e) => {
+            Ok(Box::new(warp::reply::with_status(
+                e,
+                warp::http::StatusCode::UNAUTHORIZED
+            )))
         }
     }
 }

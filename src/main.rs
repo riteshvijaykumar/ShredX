@@ -20,16 +20,22 @@ mod ui;
 mod platform;
 mod auth;
 mod config;
+mod app_config;
+mod server_client;
+mod certificate;
 
 #[cfg(feature = "server")]
 mod server;
 
 use sanitization::{DataSanitizer, SanitizationProgress};
 use advanced_wiper::{AdvancedWiper, WipingAlgorithm, WipingProgress, DeviceInfo};
-use ui::{SecureTheme, TabWidget, DriveTableWidget, DriveInfo, AdvancedOptionsWidget, show_logo};
+use ui::{SecureTheme, TabWidget, DriveTableWidget, DriveInfo, AdvancedOptionsWidget, show_logo, auth::AuthWidget};
 use platform::{get_system_drives, get_device_path_for_sanitization};
 use auth::{AuthSystem, AuthUI, AuthPage};
 use config::AppConfig;
+use app_config::AppConfig as ServerConfig;
+use server_client::ServerClient;
+use certificate::{CertificateGenerator, SanitizationCertificate, DeviceCertificateInfo, SanitizationInfo, UserInfo};
 
 #[derive(Debug, Clone)]
 struct DiskInfo {
@@ -65,12 +71,18 @@ struct HDDApp {
     // Authentication System
     auth_system: AuthSystem,
     auth_ui: AuthUI,
+    auth_widget: AuthWidget,
     is_authenticated: bool,
     
     // Configuration and Server Integration
     config: AppConfig,
-    #[cfg(feature = "server")]
-    server_client: Option<server::ServerClient>,
+    server_config: ServerConfig,
+    server_client: Option<ServerClient>,
+    
+    // Certificate Management
+    certificate_generator: CertificateGenerator,
+    certificates: Vec<SanitizationCertificate>,
+    current_sanitization_start: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl HDDApp {
@@ -87,6 +99,14 @@ impl HDDApp {
         };
         
         let config = AppConfig::load();
+        let server_config = ServerConfig::load();
+        let certificate_generator = CertificateGenerator::new();
+        
+        // Load existing certificates
+        let certificates = certificate_generator.load_certificates().unwrap_or_else(|e| {
+            eprintln!("Warning: Could not load certificates: {}", e);
+            Vec::new()
+        });
         
         let mut app = Self { 
             disks: Vec::new(),
@@ -106,16 +126,25 @@ impl HDDApp {
             
             auth_system: AuthSystem::new(),
             auth_ui: AuthUI::new(),
+            auth_widget: AuthWidget::new(),
             is_authenticated: false,
             
             config: config.clone(),
-            #[cfg(feature = "server")]
-            server_client: if config.is_server_enabled() {
-                Some(server::ServerClient::new(&config.server_url))
+            server_config: server_config.clone(),
+            server_client: if server_config.is_server_enabled() {
+                Some(ServerClient::new(server_config.server_url.clone()))
             } else {
                 None
             },
+            
+            certificate_generator,
+            certificates,
+            current_sanitization_start: None,
         };
+        
+        // Initialize authentication widget
+        app.auth_widget.initialize(app.server_config.is_server_enabled(), &app.server_config.server_url);
+        
         app.refresh_disks();
         app
     }
@@ -214,13 +243,12 @@ impl HDDApp {
     }
     
     fn handle_erase_request(&mut self) {
-        // Check user permissions first
-        if let Some(user) = self.auth_system.current_user() {
-            if !user.role.can_sanitize() {
-                self.last_error_message = Some(format!("❌ Access Denied: {} role cannot perform sanitization operations. Contact an Administrator.", user.role.as_str()));
-                return;
-            }
-        } else {
+        println!("🚨 HANDLE_ERASE_REQUEST CALLED!");
+        println!("🔐 Auth status: {}", self.auth_system.is_authenticated());
+        println!("✅ Confirm erase: {}", self.advanced_options.confirm_erase);
+        
+        // Check if user is authenticated (no role restrictions)
+        if !self.auth_system.is_authenticated() {
             self.last_error_message = Some("❌ Authentication required for sanitization operations".to_string());
             return;
         }
@@ -239,8 +267,15 @@ impl HDDApp {
             .map(|(i, _)| i)
             .collect();
             
+        // Debug information
+        println!("🔧 DEBUG: Total drives: {}", self.drive_table.drives.len());
+        for (i, drive) in self.drive_table.drives.iter().enumerate() {
+            println!("🔧 DEBUG: Drive {}: {} - Selected: {}", i, drive.name, drive.selected);
+        }
+        println!("🔧 DEBUG: Selected drives: {:?}", selected_drives);
+            
         if selected_drives.is_empty() {
-            self.last_error_message = Some("❌ No drives selected for sanitization".to_string());
+            self.last_error_message = Some("❌ No drives selected for sanitization. Please use the checkboxes to select drives first.".to_string());
             return;
         }
         
@@ -264,6 +299,9 @@ impl HDDApp {
     }
     
     fn start_real_sanitization(&mut self) {
+        // Record sanitization start time for certificate generation
+        self.current_sanitization_start = Some(chrono::Utc::now());
+        
         // Collect drives to sanitize
         let drives_to_process: Vec<(String, String, usize)> = self.drive_table.drives
             .iter()
@@ -524,6 +562,9 @@ impl HDDApp {
         if all_completed && any_in_progress {
             self.sanitization_in_progress = false;
             self.last_error_message = Some("✅ Sanitization completed successfully!".to_string());
+            
+            // Generate certificates for completed sanitization
+            self.generate_completion_certificates();
         }
     }
     
@@ -594,15 +635,29 @@ impl eframe::App for HDDApp {
         // Apply SHREDX theme
         SecureTheme::apply(ctx);
         
-        // Check authentication status
-        self.is_authenticated = self.auth_system.is_authenticated();
+        // Check authentication status from both systems
+        self.is_authenticated = self.auth_system.is_authenticated() || self.auth_widget.is_authenticated();
         
         // Set window title
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("SHREDX - HDD Secure Wipe Tool".to_string()));
         
         egui::CentralPanel::default().show(ctx, |ui| {
-            // Show authentication UI if not logged in
-            if !self.is_authenticated {
+            // Show server authentication UI if server is enabled and not authenticated
+            if self.server_config.is_server_enabled() && !self.auth_widget.is_authenticated() {
+                ui.heading("🛡️ HDD Tool Server Connection");
+                ui.add_space(20.0);
+                
+                if self.auth_widget.show(ui, ctx) {
+                    // Authentication state changed, check if now authenticated
+                    if self.auth_widget.is_authenticated() {
+                        self.refresh_disks();
+                    }
+                }
+                return; // Don't show main UI until server authenticated
+            }
+            
+            // Show local authentication UI if server is disabled and not locally authenticated
+            if !self.server_config.is_server_enabled() && !self.auth_system.is_authenticated() {
                 match self.auth_ui.current_page {
                     AuthPage::Login => {
                         if self.auth_ui.show_login(ui, &mut self.auth_system) {
@@ -644,26 +699,31 @@ impl HDDApp {
             // User info and controls
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // Logout button
-                if ui.button("� Logout").clicked() {
-                    self.auth_system.logout();
-                    self.auth_ui = AuthUI::new(); // Reset auth UI
+                if ui.button("🚪 Logout").clicked() {
+                    // Logout from the appropriate system based on configuration
+                    if self.server_config.is_server_enabled() {
+                        // Server-based authentication
+                        self.auth_widget.logout();
+                    } else {
+                        // Local authentication
+                        self.auth_system.logout();
+                        self.auth_ui = AuthUI::new(); // Reset auth UI
+                    }
                 }
                 
                 ui.add_space(10.0);
                 
-                // User management button (only for admins)
+                // User management button (available to all authenticated users)
                 let user_info = self.auth_system.current_user().cloned();
                 if let Some(user) = user_info {
-                    if user.role.can_manage_users() {
-                        if ui.button("👥 Users").clicked() {
-                            self.auth_ui.current_page = AuthPage::UserManagement;
-                            self.auth_system.logout(); // Show user management in auth context
-                        }
-                        ui.add_space(10.0);
+                    if ui.button("👥 Users").clicked() {
+                        self.auth_ui.current_page = AuthPage::UserManagement;
+                        self.auth_system.logout(); // Show user management in auth context
                     }
+                    ui.add_space(10.0);
                     
-                    // Show current user info
-                    ui.label(format!("👤 {} ({})", user.username, user.role.as_str()));
+                    // Show current user info (without role since all users are equal)
+                    ui.label(format!("👤 {}", user.username));
                     ui.add_space(10.0);
                 }
                 
@@ -677,7 +737,7 @@ impl HDDApp {
             ui.add_space(20.0);
             
             // Tab navigation
-            let active_tab = self.tab_widget.show(ui, &["Drives", "Details", "Report", "Settings"]);
+            let active_tab = self.tab_widget.show(ui, &["Drives", "Details", "Report", "Certificates", "Settings"]);
             
             ui.add_space(20.0);
             
@@ -688,9 +748,9 @@ impl HDDApp {
                     
                     ui.add_space(30.0);
                     
-                    // Advanced options and handle erase button
-                    let (can_sanitize, user_role) = if let Some(user) = self.auth_system.current_user() {
-                        (user.role.can_sanitize(), user.role.as_str())
+                    // Advanced options and handle erase button (all authenticated users can sanitize)
+                    let (can_sanitize, user_role) = if self.auth_system.is_authenticated() {
+                        (true, "User") // All authenticated users can sanitize
                     } else {
                         (false, "Unauthenticated")
                     };
@@ -698,11 +758,32 @@ impl HDDApp {
                     if self.advanced_options.show_with_permissions(ui, can_sanitize, user_role) {
                         self.handle_erase_request();
                     }
+                    
+                    // Show status messages
+                    if let Some(ref message) = self.last_error_message {
+                        ui.add_space(15.0);
+                        if message.starts_with("✅") {
+                            ui.colored_label(SecureTheme::SUCCESS_GREEN, message);
+                        } else if message.starts_with("🚀") {
+                            ui.colored_label(SecureTheme::LIGHT_BLUE, message);
+                        } else {
+                            ui.colored_label(SecureTheme::DANGER_RED, message);
+                        }
+                    }
                 },
                 1 => {
                     // Details tab
                     ui.vertical_centered(|ui| {
-                        ui.heading("Drive Details");
+                        // Navigation: Back button
+                        ui.horizontal(|ui| {
+                            if ui.button("← Back to Drives").clicked() {
+                                self.tab_widget.active_tab = 0;
+                            }
+                            ui.add_space(20.0);
+                            ui.heading("Drive Details");
+                        });
+                        
+                        ui.add_space(10.0);
                         ui.label("Selected drives information will appear here");
                         
                         // Show details for selected drives
@@ -728,7 +809,14 @@ impl HDDApp {
                 2 => {
                     // Report tab
                     ui.vertical_centered(|ui| {
-                        ui.heading("Sanitization Reports");
+                        // Navigation: Back button
+                        ui.horizontal(|ui| {
+                            if ui.button("← Back to Drives").clicked() {
+                                self.tab_widget.active_tab = 0;
+                            }
+                            ui.add_space(20.0);
+                            ui.heading("Sanitization Reports");
+                        });
                         
                         if let Some(ref message) = self.last_error_message {
                             ui.add_space(20.0);
@@ -823,11 +911,160 @@ impl HDDApp {
                     });
                 },
                 3 => {
-                    // Settings tab
+                    // Certificates tab - with back button
+                    ui.horizontal(|ui| {
+                        if ui.button("← Back to Drives").clicked() {
+                            self.tab_widget.active_tab = 0;
+                        }
+                        ui.add_space(20.0);
+                    });
+                    self.show_certificates_tab(ui);
+                },
+                4 => {
+                    // Settings tab - with back button
+                    ui.horizontal(|ui| {
+                        if ui.button("← Back to Drives").clicked() {
+                            self.tab_widget.active_tab = 0;
+                        }
+                        ui.add_space(20.0);
+                    });
                     self.show_settings_tab(ui);
                 },
                 _ => {}
             }
+    }
+    
+    fn show_certificates_tab(&mut self, ui: &mut egui::Ui) {
+        ui.vertical_centered(|ui| {
+            ui.heading("📜 Sanitization Certificates");
+            ui.add_space(20.0);
+            
+            // Refresh certificates button
+            ui.horizontal(|ui| {
+                if ui.button("🔄 Refresh").clicked() {
+                    self.certificates = self.certificate_generator.load_certificates().unwrap_or_else(|e| {
+                        eprintln!("Warning: Could not load certificates: {}", e);
+                        Vec::new()
+                    });
+                }
+                
+                ui.add_space(20.0);
+                ui.label(format!("Total certificates: {}", self.certificates.len()));
+            });
+            
+            ui.add_space(20.0);
+            
+            if self.certificates.is_empty() {
+                ui.group(|ui| {
+                    ui.set_min_width(600.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label("📭 No certificates available");
+                        ui.add_space(10.0);
+                        ui.label("Complete a sanitization process to generate certificates");
+                        ui.add_space(20.0);
+                    });
+                });
+            } else {
+                // Show certificates in a scrollable area
+                egui::ScrollArea::vertical()
+                    .max_height(400.0)
+                    .show(ui, |ui| {
+                        let certificates_to_show: Vec<SanitizationCertificate> = self.certificates.clone();
+                        for (index, certificate) in certificates_to_show.iter().enumerate() {
+                            ui.group(|ui| {
+                                ui.set_min_width(800.0);
+                                
+                                // Certificate header
+                                ui.horizontal(|ui| {
+                                    // Status indicator
+                                    let status_color = if certificate.sanitization_info.success {
+                                        SecureTheme::SUCCESS_GREEN
+                                    } else {
+                                        SecureTheme::DANGER_RED
+                                    };
+                                    
+                                    ui.colored_label(status_color, if certificate.sanitization_info.success { "✅" } else { "❌" });
+                                    
+                                    ui.vertical(|ui| {
+                                        ui.heading(&certificate.device_info.device_name);
+                                        ui.label(format!("Certificate ID: {}", &certificate.id[..8]));
+                                    });
+                                    
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(certificate.timestamp.format("%Y-%m-%d %H:%M:%S").to_string());
+                                    });
+                                });
+                                
+                                ui.add_space(10.0);
+                                
+                                // Certificate details in columns
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.strong("Device Information:");
+                                        ui.label(format!("Path: {}", certificate.device_info.device_path));
+                                        ui.label(format!("Type: {}", certificate.device_info.device_type));
+                                        ui.label(format!("Capacity: {}", Self::format_bytes(certificate.device_info.capacity)));
+                                    });
+                                    
+                                    ui.add_space(30.0);
+                                    
+                                    ui.vertical(|ui| {
+                                        ui.strong("Sanitization Details:");
+                                        ui.label(format!("Method: {}", certificate.sanitization_info.method));
+                                        ui.label(format!("Algorithm: {}", certificate.sanitization_info.algorithm));
+                                        ui.label(format!("Passes: {}", certificate.sanitization_info.passes_completed));
+                                        ui.label(format!("Duration: {} min", certificate.sanitization_info.duration_seconds / 60));
+                                    });
+                                    
+                                    ui.add_space(30.0);
+                                    
+                                    ui.vertical(|ui| {
+                                        ui.strong("Compliance:");
+                                        ui.label(format!("Security Level: {}", certificate.compliance_info.security_level));
+                                        ui.label(format!("NIST: {}", if certificate.compliance_info.nist_compliant { "✅" } else { "❌" }));
+                                        ui.label(format!("DoD: {}", if certificate.compliance_info.dod_compliant { "✅" } else { "❌" }));
+                                        ui.label(format!("Standards: {}", certificate.compliance_info.standards_met.join(", ")));
+                                    });
+                                });
+                                
+                                ui.add_space(10.0);
+                                
+                                // Action buttons
+                                ui.horizontal(|ui| {
+                                    if ui.button("📄 View Report").clicked() {
+                                        let report = self.certificate_generator.generate_certificate_report(certificate);
+                                        println!("{}", report);
+                                        self.last_error_message = Some("Certificate report printed to console".to_string());
+                                    }
+                                    
+                                    if ui.button("💾 Save Report").clicked() {
+                                        match self.certificate_generator.save_certificate_report(certificate) {
+                                            Ok(filepath) => {
+                                                self.last_error_message = Some(format!("✅ Report saved: {}", filepath));
+                                            }
+                                            Err(e) => {
+                                                self.last_error_message = Some(format!("❌ Failed to save report: {}", e));
+                                            }
+                                        }
+                                    }
+                                    
+                                    if self.server_config.is_server_enabled() && self.auth_widget.is_authenticated() {
+                                        if ui.button("☁️ Upload to Server").clicked() {
+                                            self.upload_certificate_to_server(certificate.clone());
+                                            self.last_error_message = Some("Certificate upload initiated...".to_string());
+                                        }
+                                    }
+                                });
+                            });
+                            
+                            if index < self.certificates.len() - 1 {
+                                ui.add_space(10.0);
+                            }
+                        }
+                    });
+            }
+        });
     }
     
     fn show_settings_tab(&mut self, ui: &mut egui::Ui) {
@@ -976,6 +1213,153 @@ impl HDDApp {
                 ui.label("Certificates location: ./reports/");
             });
         });
+    }
+    
+    fn generate_completion_certificates(&mut self) {
+        let end_time = chrono::Utc::now();
+        let start_time = self.current_sanitization_start.unwrap_or(end_time);
+        
+        // Get current user information
+        let user_info = if let Some(user) = self.auth_system.current_user() {
+            UserInfo {
+                username: user.username.clone(),
+                user_id: user.id.clone(),
+                organization: "HDD Tool User".to_string(),
+                role: "User".to_string(), // All users have the same role now
+            }
+        } else {
+            UserInfo {
+                username: "Unknown".to_string(),
+                user_id: "unknown".to_string(),
+                organization: "HDD Tool User".to_string(),
+                role: "User".to_string(),
+            }
+        };
+
+        // Generate certificates for each completed drive
+        for (drive_index, drive) in self.drive_table.drives.iter().enumerate() {
+            if drive.selected && drive.progress >= 1.0 {
+                if let Some(disk_info) = self.disks.get(drive_index) {
+                    // Create device certificate info
+                    let device_info = DeviceCertificateInfo {
+                        device_path: disk_info.drive_letter.clone(),
+                        device_name: drive.name.clone(),
+                        device_type: disk_info.drive_type.clone(),
+                        manufacturer: "Unknown".to_string(), // Would be detected from actual hardware
+                        model: "Unknown".to_string(),
+                        serial_number: "N/A".to_string(),
+                        capacity: disk_info.total_space,
+                        sector_size: 512, // Standard sector size
+                        supports_secure_erase: false, // Would be detected
+                        supports_crypto_erase: false,
+                        encryption_status: "Unknown".to_string(),
+                    };
+
+                    // Create sanitization info
+                    let duration = end_time.signed_duration_since(start_time).num_seconds() as u64;
+                    let speed = if duration > 0 {
+                        (disk_info.total_space as f64) / (duration as f64 * 1024.0 * 1024.0)
+                    } else {
+                        0.0
+                    };
+
+                    let sanitization_info = SanitizationInfo {
+                        method: self.advanced_options.eraser_method.clone(),
+                        algorithm: format!("{:?}", self.selected_algorithm),
+                        passes_completed: match self.selected_algorithm {
+                            WipingAlgorithm::DoD522022M => 3,
+                            WipingAlgorithm::Gutmann => 35,  
+                            WipingAlgorithm::SevenPass => 7,
+                            WipingAlgorithm::ThreePass => 3,
+                            WipingAlgorithm::TwoPass => 2,
+                            _ => 1,
+                        },
+                        total_bytes_processed: disk_info.total_space,
+                        start_time,
+                        end_time,
+                        duration_seconds: duration,
+                        average_speed_mbps: speed,
+                        success: true,
+                        error_count: 0,
+                    };
+
+                    // Generate certificate
+                    match self.certificate_generator.generate_certificate(
+                        device_info,
+                        sanitization_info,
+                        user_info.clone(),
+                    ) {
+                        Ok(certificate) => {
+                            // Save certificate locally
+                            if let Err(e) = self.certificate_generator.save_certificate_local(&certificate) {
+                                eprintln!("Warning: Could not save certificate locally: {}", e);
+                            }
+
+                            // Save human-readable report
+                            if let Err(e) = self.certificate_generator.save_certificate_report(&certificate) {
+                                eprintln!("Warning: Could not save certificate report: {}", e);
+                            }
+
+                            // Add to local certificates list
+                            self.certificates.push(certificate.clone());
+
+                            // Upload to server if configured and authenticated
+                            if self.server_config.auto_upload_certificates {
+                                if self.auth_widget.is_authenticated() {
+                                    self.upload_certificate_to_server(certificate);
+                                } else if self.auth_system.is_authenticated() {
+                                    // Could upload via local auth too if we had server integration
+                                    println!("Certificate ready for server upload when server connection is available");
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error generating certificate for {}: {}", drive.name, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        self.current_sanitization_start = None; // Reset for next sanitization
+    }
+
+    fn upload_certificate_to_server(&self, certificate: SanitizationCertificate) {
+        if let Some(ref server_client) = self.server_client {
+            let certificate_data = match serde_json::to_string(&certificate) {
+                Ok(data) => data,
+                Err(e) => {
+                    eprintln!("Error serializing certificate: {}", e);
+                    return;
+                }
+            };
+
+            let device_info = format!("{} - {} ({})", 
+                certificate.device_info.device_name,
+                certificate.device_info.device_type,
+                certificate.device_info.device_path);
+
+            let method = certificate.sanitization_info.method.clone();
+
+            // Clone server_client for async operation
+            let server_client_clone = server_client.clone();
+            
+            // Upload in background thread
+            tokio::spawn(async move {
+                match server_client_clone.upload_certificate(certificate_data, device_info, method).await {
+                    Ok(response) => {
+                        if response.success {
+                            println!("✅ Certificate uploaded to server successfully!");
+                        } else {
+                            println!("❌ Server rejected certificate: {}", response.message);
+                        }
+                    }
+                    Err(e) => {
+                        println!("❌ Failed to upload certificate to server: {}", e);
+                    }
+                }
+            });
+        }
     }
 }
 

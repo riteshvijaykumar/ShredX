@@ -8,6 +8,7 @@ use sha2::{Sha256, Digest};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
+    pub id: String,
     pub username: String,
     pub password_hash: String,
     pub email: String,
@@ -26,19 +27,15 @@ pub enum UserRole {
 
 impl UserRole {
     pub fn can_sanitize(&self) -> bool {
-        matches!(self, UserRole::Admin | UserRole::Operator)
+        true // All users can sanitize now
     }
     
     pub fn can_manage_users(&self) -> bool {
-        matches!(self, UserRole::Admin)
+        true // All users can manage users now
     }
     
     pub fn as_str(&self) -> &str {
-        match self {
-            UserRole::Admin => "Administrator",
-            UserRole::Operator => "Operator", 
-            UserRole::Viewer => "Viewer",
-        }
+        "User" // All users have the same role display
     }
 }
 
@@ -69,10 +66,11 @@ impl AuthSystem {
     
     fn create_default_admin(&mut self) {
         let admin_user = User {
+            id: uuid::Uuid::new_v4().to_string(),
             username: "admin".to_string(),
             password_hash: Self::hash_password("admin123"),
             email: "admin@hddtool.local".to_string(),
-            role: UserRole::Admin,
+            role: UserRole::Admin, // Still admin internally, but all roles have same permissions
             created_at: Utc::now(),
             last_login: None,
             is_active: true,
@@ -123,6 +121,7 @@ impl AuthSystem {
         }
         
         let user = User {
+            id: uuid::Uuid::new_v4().to_string(),
             username: username.to_string(),
             password_hash: Self::hash_password(password),
             email: email.to_string(),
@@ -407,7 +406,7 @@ impl AuthUI {
                                 &self.create_username,
                                 &self.create_password,
                                 &self.create_email,
-                                UserRole::Operator // Default role for new users
+                                UserRole::Admin // All users get same permissions anyway
                             ) {
                                 Ok(()) => {
                                     self.success_message = Some(format!("User '{}' created successfully!", self.create_username));
@@ -457,14 +456,13 @@ impl AuthUI {
             
             egui::ScrollArea::vertical().show(ui, |ui| {
                 egui::Grid::new("user_grid")
-                    .num_columns(6)
+                    .num_columns(5)
                     .spacing([10.0, 4.0])
                     .striped(true)
                     .show(ui, |ui| {
-                        // Header
+                        // Header (removed Role column since all users are equal)
                         ui.strong("Username");
                         ui.strong("Email");
-                        ui.strong("Role");
                         ui.strong("Status");
                         ui.strong("Last Login");
                         ui.strong("Actions");
@@ -474,7 +472,6 @@ impl AuthUI {
                         for user in &users {
                             ui.label(&user.username);
                             ui.label(&user.email);
-                            ui.label(user.role.as_str());
                             
                             let status_color = if user.is_active {
                                 egui::Color32::from_rgb(34, 197, 94)

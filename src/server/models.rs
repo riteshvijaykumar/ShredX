@@ -33,11 +33,12 @@ pub struct SanitizationLog {
     pub device_type: String,
     pub method: String,
     pub status: String,           // "completed", "failed", "in_progress"
-    pub duration_seconds: Option<i64>,
-    pub bytes_processed: Option<i64>,
-    pub error_message: Option<String>,
     pub started_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+    pub bytes_processed: Option<i64>,
+    pub verification_passed: Option<bool>,
+    pub error_message: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,6 +78,38 @@ pub struct CertificateResponse {
 pub struct SanitizationLogResponse {
     pub logs: Vec<SanitizationLog>,
     pub total: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StoreCertificateRequest {
+    pub user_id: Uuid,
+    pub certificate_data: String,
+    pub device_info: String,
+    pub sanitization_method: String,
+    pub file_hash: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SanitizationLogRequest {
+    pub user_id: Uuid,
+    pub certificate_id: Option<Uuid>,
+    pub device_path: String,
+    pub device_type: String,
+    pub method: String,
+    pub status: String,
+    pub started_at: DateTime<Utc>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub bytes_processed: Option<i64>,
+    pub verification_passed: Option<bool>,
+    pub error_message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PaginatedResponse<T> {
+    pub data: Vec<T>,
+    pub total: u64,
+    pub page: u64,
+    pub per_page: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
