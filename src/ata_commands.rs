@@ -22,7 +22,7 @@ use std::mem;
 use windows::{
     core::PWSTR,
     Win32::{
-        Foundation::{CloseHandle, HANDLE, BOOL},
+        Foundation::{CloseHandle, HANDLE},
         Storage::FileSystem::{CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING},
         System::IO::DeviceIoControl,
     },
@@ -444,16 +444,12 @@ impl AtaInterface {
         
         println!("🔧 Performing ATA Security Erase (Enhanced: {})", enhanced);
         
-        // For safety in this demo, we'll just simulate the operation
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        
-        // In a real implementation, you would use ATA_PASS_THROUGH to send:
-        // - ATA_SECURITY_SET_PASSWORD command
-        // - ATA_SECURITY_ERASE_PREPARE command  
-        // - ATA_SECURITY_ERASE_UNIT command
-        
-        println!("✅ ATA Security Erase completed");
-        Ok(())
+        // Return error to force fallback to software overwrite
+        // This is safer than simulating success without actually erasing data
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "ATA Security Erase not fully implemented. Falling back to software overwrite."
+        ))
     }
 }
 

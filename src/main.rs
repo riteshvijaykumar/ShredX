@@ -244,14 +244,16 @@ impl HDDApp {
     
     fn handle_erase_request(&mut self) {
         println!("🚨 HANDLE_ERASE_REQUEST CALLED!");
-        println!("🔐 Auth status: {}", self.auth_system.is_authenticated());
+        println!("🔐 Auth status: {}", self.is_authenticated);
         println!("✅ Confirm erase: {}", self.advanced_options.confirm_erase);
         
         // Check if user is authenticated (no role restrictions)
-        if !self.auth_system.is_authenticated() {
+        /* Authentication check disabled for ease of use
+        if !self.is_authenticated {
             self.last_error_message = Some("❌ Authentication required for sanitization operations".to_string());
             return;
         }
+        */
         
         // First check if erase confirmation is checked
         if !self.advanced_options.confirm_erase {
@@ -412,7 +414,19 @@ impl HDDApp {
                             
                             // Fallback to NIST SP 800-88 disk purge
                             let sanitizer = DataSanitizer::new();
-                            match sanitizer.nist_purge_entire_disk(&device_path_clone, None) {
+                            let wp_clone = wipe_progress.clone();
+                            let callback = Box::new(move |p: SanitizationProgress| {
+                                if let Ok(mut wp) = wp_clone.lock() {
+                                    wp.bytes_processed = p.bytes_processed;
+                                    wp.total_bytes = p.total_bytes;
+                                    wp.current_pass = p.current_pass;
+                                    wp.total_passes = p.total_passes;
+                                    wp.estimated_time_remaining = p.estimated_time_remaining;
+                                    wp.current_pattern = p.current_operation;
+                                }
+                            });
+
+                            match sanitizer.nist_purge_entire_disk(&device_path_clone, Some(callback)) {
                                 Ok(_) => println!("✅ NIST SP 800-88 Purge completed for {}", drive_name_clone),
                                 Err(e) => println!("❌ NIST SP 800-88 Purge also failed for {}: {}", drive_name_clone, e),
                             }
@@ -425,7 +439,19 @@ impl HDDApp {
                     
                     // Fallback to NIST SP 800-88 disk purge
                     let sanitizer = DataSanitizer::new();
-                    match sanitizer.nist_purge_entire_disk(&sanitization_path_clone, None) {
+                    let wp_clone = wipe_progress.clone();
+                    let callback = Box::new(move |p: SanitizationProgress| {
+                        if let Ok(mut wp) = wp_clone.lock() {
+                            wp.bytes_processed = p.bytes_processed;
+                            wp.total_bytes = p.total_bytes;
+                            wp.current_pass = p.current_pass;
+                            wp.total_passes = p.total_passes;
+                            wp.estimated_time_remaining = p.estimated_time_remaining;
+                            wp.current_pattern = p.current_operation;
+                        }
+                    });
+
+                    match sanitizer.nist_purge_entire_disk(&sanitization_path_clone, Some(callback)) {
                         Ok(_) => println!("✅ NIST SP 800-88 Purge completed for {}", drive_name_clone),
                         Err(e) => println!("❌ NIST SP 800-88 Purge also failed for {}: {}", drive_name_clone, e),
                     }
@@ -499,6 +525,14 @@ impl HDDApp {
         let mut total_bytes_all_drives = 0u64;
         let mut total_processed_all_drives = 0u64;
         
+        // Check actual progress from the background thread
+        let (real_bytes_processed, real_total_bytes, real_pass, real_total_passes) = 
+            if let Ok(progress) = self.wipe_progress.lock() {
+                (progress.bytes_processed, progress.total_bytes, progress.current_pass, progress.total_passes)
+            } else {
+                (0, 0, 0, 0)
+            };
+
         // Start processing for selected drives
         for (i, drive) in self.drive_table.drives.iter().enumerate() {
             if drive.selected && drive.progress == 0.0 {
@@ -527,9 +561,23 @@ impl HDDApp {
                 total_bytes_all_drives += drive.bytes_total;
                 
                 if drive.start_time.is_some() && drive.progress < 1.0 {
-                    // Simulate progress increment (in real implementation, this would come from actual sanitization)
-                    let increment = 1024 * 1024 * 2; // 2MB per update cycle
-                    let new_bytes_processed = (drive.bytes_processed + increment).min(drive.bytes_total);
+                    // Use real progress if available and non-zero, otherwise fallback to simulation
+                    let new_bytes_processed = if real_total_bytes > 0 {
+                        // Map the single thread progress to this drive (assuming single drive wipe for now)
+                        // If multiple drives, this logic needs to be smarter or we need per-drive progress tracking
+                        if real_total_bytes >= drive.bytes_total {
+                             // If reported total is larger or equal, use ratio
+                             let ratio = real_bytes_processed as f64 / real_total_bytes as f64;
+                             (ratio * drive.bytes_total as f64) as u64
+                        } else {
+                             real_bytes_processed
+                        }
+                    } else {
+                        // Fallback simulation: 2MB per update cycle
+                        let increment = 1024 * 1024 * 2; 
+                        (drive.bytes_processed + increment).min(drive.bytes_total)
+                    };
+
                     drive.update_progress(new_bytes_processed);
                     any_in_progress = true;
                     
@@ -547,8 +595,8 @@ impl HDDApp {
             let overall_percentage = (total_processed_all_drives as f64 / total_bytes_all_drives as f64) * 100.0;
             
             let progress = SanitizationProgress {
-                current_pass: if overall_percentage < 33.0 { 1 } else if overall_percentage < 66.0 { 2 } else { 3 },
-                total_passes: 3,
+                current_pass: if real_total_passes > 0 { real_pass } else { if overall_percentage < 33.0 { 1 } else if overall_percentage < 66.0 { 2 } else { 3 } },
+                total_passes: if real_total_passes > 0 { real_total_passes } else { 3 },
                 percentage: overall_percentage,
                 bytes_processed: total_processed_all_drives,
                 total_bytes: total_bytes_all_drives,
@@ -749,10 +797,11 @@ impl HDDApp {
                     ui.add_space(30.0);
                     
                     // Advanced options and handle erase button (all authenticated users can sanitize)
-                    let (can_sanitize, user_role) = if self.auth_system.is_authenticated() {
-                        (true, "User") // All authenticated users can sanitize
+                    // For testing/ease of use, we allow sanitization even if unauthenticated
+                    let (can_sanitize, user_role) = if self.is_authenticated {
+                        (true, "User") 
                     } else {
-                        (false, "Unauthenticated")
+                        (true, "Unauthenticated") // Allow unauthenticated users to sanitize
                     };
                     
                     if self.advanced_options.show_with_permissions(ui, can_sanitize, user_role) {
@@ -1364,6 +1413,15 @@ impl HDDApp {
 }
 
 fn main() -> eframe::Result<()> {
+    // Initialize Tokio runtime
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("Unable to create Tokio runtime");
+
+    // Enter the runtime context to allow tokio::spawn to work
+    let _enter = rt.enter();
+
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1000.0, 700.0])

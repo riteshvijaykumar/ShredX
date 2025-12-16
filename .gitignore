@@ -30,3 +30,6 @@ Thumbs.db
 *.dll
 *.lib
 *.exp
+certificates/
+config.json
+users.json

@@ -134,45 +134,12 @@ impl SdCardEraser {
     ) -> io::Result<()> {
         println!("🔄 Starting filesystem-level secure deletion for SD card");
         
-        // Update progress
-        if let Ok(mut progress) = progress_callback.lock() {
-            progress.current_pass = 1;
-            progress.total_passes = 4;
-            progress.current_pattern = "File Analysis".to_string();
-        }
-        
-        // Step 1: Analyze filesystem
-        self.analyze_filesystem(&device_info.device_path)?;
-        
-        // Update progress
-        if let Ok(mut progress) = progress_callback.lock() {
-            progress.current_pass = 2;
-            progress.current_pattern = "File Deletion".to_string();
-        }
-        
-        // Step 2: Secure delete all files
-        self.secure_delete_files(&device_info.device_path)?;
-        
-        // Update progress
-        if let Ok(mut progress) = progress_callback.lock() {
-            progress.current_pass = 3;
-            progress.current_pattern = "Free Space Fill".to_string();
-        }
-        
-        // Step 3: Fill free space once
-        self.fill_free_space_once(&device_info.device_path, progress_callback.clone())?;
-        
-        // Update progress
-        if let Ok(mut progress) = progress_callback.lock() {
-            progress.current_pass = 4;
-            progress.current_pattern = "Cleanup".to_string();
-        }
-        
-        // Step 4: Final cleanup
-        self.cleanup_filesystem(&device_info.device_path)?;
-        
-        println!("✅ Filesystem-level secure deletion completed for SD card");
-        Ok(())
+        // This feature requires complex filesystem parsing which is not fully implemented
+        // Return error to avoid false sense of security
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Filesystem-level secure deletion not implemented. Please use block-level erasure (Random or Zeros)."
+        ))
     }
     
     /// Quick format for SD cards
@@ -266,21 +233,19 @@ impl SdCardEraser {
     }
     
     /// Execute SD card native erase command
-    fn execute_sd_erase_command(&self, device_info: &DeviceInfo) -> io::Result<()> {
+    fn execute_sd_erase_command(&self, _device_info: &DeviceInfo) -> io::Result<()> {
         // This would typically use SD card specific commands
-        // For now, simulate the operation
+        // For now, return error to force fallback to software erasure
         println!("🔧 Executing SD native erase command...");
         
-        // Simulate erase time based on card size
-        let erase_time_ms = std::cmp::min(5000, (device_info.size_bytes / (1024 * 1024)) as u64 * 10);
-        std::thread::sleep(Duration::from_millis(erase_time_ms));
-        
-        println!("✅ SD native erase completed");
-        Ok(())
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "SD native erase command not implemented for this platform"
+        ))
     }
     
     /// Analyze filesystem on SD card
-    fn analyze_filesystem(&self, device_path: &str) -> io::Result<()> {
+    fn _analyze_filesystem(&self, device_path: &str) -> io::Result<()> {
         println!("🔍 Analyzing filesystem on SD card...");
         std::thread::sleep(Duration::from_millis(500));
         println!("✅ Filesystem analysis completed");
@@ -288,7 +253,7 @@ impl SdCardEraser {
     }
     
     /// Secure delete all files
-    fn secure_delete_files(&self, device_path: &str) -> io::Result<()> {
+    fn _secure_delete_files(&self, device_path: &str) -> io::Result<()> {
         println!("🗑️  Securely deleting files on SD card...");
         std::thread::sleep(Duration::from_secs(2));
         println!("✅ File deletion completed");
@@ -296,7 +261,7 @@ impl SdCardEraser {
     }
     
     /// Fill free space once (gentle for SD cards)
-    fn fill_free_space_once(
+    fn _fill_free_space_once(
         &self,
         device_path: &str,
         progress_callback: Arc<Mutex<WipingProgress>>,
@@ -355,7 +320,7 @@ impl SdCardEraser {
     }
     
     /// Cleanup filesystem
-    fn cleanup_filesystem(&self, device_path: &str) -> io::Result<()> {
+    fn _cleanup_filesystem(&self, device_path: &str) -> io::Result<()> {
         println!("🧹 Cleaning up SD card filesystem...");
         std::thread::sleep(Duration::from_millis(500));
         println!("✅ Filesystem cleanup completed");

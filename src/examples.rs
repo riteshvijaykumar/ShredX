@@ -11,8 +11,6 @@
 // Example usage of NIST 800-88 sanitization methods
 // This file demonstrates how to use the sanitization module
 
-use std::sync::{Arc, Mutex};
-use std::thread;
 use crate::sanitization::{DataSanitizer, SanitizationMethod, SanitizationPattern, SanitizationProgress};
 
 // ============================================================================

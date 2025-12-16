@@ -239,15 +239,15 @@ impl UsbEraser {
     }
     
     /// Delete all files on the drive
-    fn delete_all_files(&self, device_path: &str) -> io::Result<()> {
+    fn delete_all_files(&self, _device_path: &str) -> io::Result<()> {
         println!("🗑️  Deleting all files...");
         
         // This would recursively delete all files and directories
-        // For now, simulate the operation
-        std::thread::sleep(Duration::from_secs(2));
-        
-        println!("✅ File deletion completed");
-        Ok(())
+        // For now, return error as it is not implemented
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Recursive file deletion not implemented"
+        ))
     }
     
     /// Fill free space with random data
@@ -307,14 +307,15 @@ impl UsbEraser {
     }
     
     /// Clean up temporary files
-    fn cleanup_temp_files(&self, device_path: &str) -> io::Result<()> {
+    fn cleanup_temp_files(&self, _device_path: &str) -> io::Result<()> {
         println!("🧹 Cleaning up temporary files...");
         
         // This would clean up any remaining temporary files
-        std::thread::sleep(Duration::from_millis(500));
-        
-        println!("✅ Cleanup completed");
-        Ok(())
+        // For now, return error as it is not implemented
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Cleanup temp files not implemented"
+        ))
     }
     
     /// Extract drive letter from device path

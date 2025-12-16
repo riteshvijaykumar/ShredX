@@ -166,7 +166,22 @@ impl DataSanitizer {
             Err(e) => {
                 println!("❌ Cannot access device directly: {}", e);
                 println!("🔄 Falling back to file-system level sanitization");
-                return self.sanitize_files_and_free_space_fallback(device_path, 3, progress_callback);
+                
+                // Try to determine mount point for fallback
+                let fallback_path = if cfg!(windows) {
+                    let path_str = device_path.to_string_lossy();
+                    if path_str.starts_with(r"\\.\") && path_str.ends_with(":") {
+                        // Convert \\.\X: to X:\
+                        let drive_letter = &path_str[4..5];
+                        std::path::PathBuf::from(format!("{}:\\", drive_letter))
+                    } else {
+                        device_path.to_path_buf()
+                    }
+                } else {
+                    device_path.to_path_buf()
+                };
+
+                return self.sanitize_files_and_free_space_fallback(fallback_path, 3, progress_callback);
             }
         };
         
@@ -254,7 +269,7 @@ impl DataSanitizer {
         progress_callback: Option<Box<dyn Fn(SanitizationProgress)>>,
     ) -> io::Result<()> {
         println!("🔄 Using file-system level sanitization as fallback");
-        self.sanitize_files_and_free_space(drive_root, passes, None)
+        self.sanitize_files_and_free_space(drive_root, passes, progress_callback)
     }
 
     /// File-level sanitization for when direct device access fails
@@ -263,7 +278,7 @@ impl DataSanitizer {
         &self,
         drive_root: P,
         passes: u32,
-        _progress_callback: Option<Box<dyn Fn(SanitizationProgress)>>,
+        progress_callback: Option<Box<dyn Fn(SanitizationProgress)>>,
     ) -> io::Result<()> {
         let drive_path = drive_root.as_ref();
         
@@ -282,7 +297,7 @@ impl DataSanitizer {
         
         // Step 1: Overwrite all existing files
         println!("🗂️  Phase 1: Overwriting all existing files...");
-        match self.overwrite_all_files(drive_path, passes) {
+        match self.overwrite_all_files(drive_path, passes, &progress_callback) {
             Ok(_) => println!("✅ File overwriting completed"),
             Err(e) => {
                 println!("❌ File overwriting failed: {}", e);
@@ -292,7 +307,7 @@ impl DataSanitizer {
         
         // Step 2: Fill free space with random data
         println!("💾 Phase 2: Filling free space with random data...");
-        match self.fill_free_space(drive_path, passes) {
+        match self.fill_free_space(drive_path, passes, &progress_callback) {
             Ok(_) => println!("✅ Free space filling completed"),
             Err(e) => {
                 println!("❌ Free space filling failed: {}", e);
@@ -305,7 +320,7 @@ impl DataSanitizer {
     }
 
     /// Recursively overwrite all files in a directory
-    fn overwrite_all_files(&self, dir: &Path, passes: u32) -> io::Result<()> {
+    fn overwrite_all_files(&self, dir: &Path, passes: u32, progress_callback: &Option<Box<dyn Fn(SanitizationProgress)>>) -> io::Result<()> {
         if !dir.is_dir() {
             println!("❌ Path is not a directory: {}", dir.display());
             return Ok(());
@@ -339,7 +354,7 @@ impl DataSanitizer {
                 dir_count += 1;
                 println!("📁 Processing subdirectory: {}", path.display());
                 // Recursively process subdirectories
-                if let Err(e) = self.overwrite_all_files(&path, passes) {
+                if let Err(e) = self.overwrite_all_files(&path, passes, progress_callback) {
                     println!("❌ Failed to process subdirectory {}: {}", path.display(), e);
                 }
             } else if path.is_file() {
@@ -349,6 +364,20 @@ impl DataSanitizer {
                 // Overwrite the file multiple times
                 for pass in 1..=passes {
                     println!("  🔄 Pass {}/{}: Overwriting {}", pass, passes, path.display());
+                    
+                    // Update progress
+                    if let Some(cb) = progress_callback {
+                        cb(SanitizationProgress {
+                            bytes_processed: 0, // Cannot track total bytes easily in recursive walk
+                            total_bytes: 0,
+                            current_pass: pass,
+                            total_passes: passes,
+                            percentage: 0.0,
+                            estimated_time_remaining: std::time::Duration::from_secs(0),
+                            current_operation: format!("Overwriting file: {}", path.file_name().unwrap_or_default().to_string_lossy()),
+                        });
+                    }
+
                     if let Err(e) = self.overwrite_single_file(&path) {
                         println!("  ❌ Failed to overwrite {}: {}", path.display(), e);
                         continue;
@@ -409,11 +438,24 @@ impl DataSanitizer {
 
     /// Fill free space with random data
     /// Optimized free space filling with better performance
-    fn fill_free_space(&self, drive_path: &Path, passes: u32) -> io::Result<()> {
+    fn fill_free_space(&self, drive_path: &Path, passes: u32, progress_callback: &Option<Box<dyn Fn(SanitizationProgress)>>) -> io::Result<()> {
         let start_time = Instant::now();
         
         for pass in 1..=passes {
             println!("🚀 Pass {}/{}: Optimized free space filling on {}", pass, passes, drive_path.display());
+            
+            // Update progress
+            if let Some(cb) = progress_callback {
+                cb(SanitizationProgress {
+                    bytes_processed: 0,
+                    total_bytes: 0,
+                    current_pass: pass,
+                    total_passes: passes,
+                    percentage: 0.0,
+                    estimated_time_remaining: std::time::Duration::from_secs(0),
+                    current_operation: format!("Filling free space (Pass {}/{})", pass, passes),
+                });
+            }
             
             // Create a temporary directory for our fill files
             let temp_dir = drive_path.join("__sanitize_temp__");
@@ -667,10 +709,7 @@ impl DataSanitizer {
         drop(tx); // Close sender
         
         // Monitor progress while threads work
-        let mut completed_chunks = 0;
         for _ in rx {
-            completed_chunks += 1;
-            
             if let Some(callback) = progress_callback {
                 let bytes_processed = {
                     let counter = progress_counter.lock().unwrap();

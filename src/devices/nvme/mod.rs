@@ -300,9 +300,11 @@ impl NvmeEraser {
             }
             Err(_) => {
                 // Fallback: simulate the operation
-                println!("ℹ️  nvme-cli not available, simulating NVMe format...");
-                std::thread::sleep(Duration::from_secs(5)); // Simulate format time
-                Ok(())
+                println!("ℹ️  nvme-cli not available, cannot perform NVMe format.");
+                Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "nvme-cli tool not found. Cannot perform hardware secure erase."
+                ))
             }
         }
     }
@@ -334,15 +336,17 @@ impl NvmeEraser {
     /// Execute Deallocate command
     fn execute_deallocate_command(
         &self,
-        device_info: &DeviceInfo,
+        _device_info: &DeviceInfo,
         start_block: u64,
         num_blocks: u64,
     ) -> io::Result<()> {
         // This would typically use NVMe Deallocate command
-        // For now, simulate the operation
+        // For now, return error as we cannot guarantee erasure without proper driver support
         println!("🔧 Deallocating blocks {} to {}", start_block, start_block + num_blocks - 1);
-        std::thread::sleep(Duration::from_millis(100)); // Simulate deallocate time
-        Ok(())
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "NVMe Deallocate not implemented for this platform"
+        ))
     }
     
     /// Overwrite device with specific pattern (NVMe-optimized)
