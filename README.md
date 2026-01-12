@@ -63,6 +63,39 @@ HDD Tool is a **cross-platform** enterprise-grade data sanitization tool that fu
 - ✅ **Audit trail logging**
 - ✅ **Professional reporting**
 
+## 📚 Project Report Sections
+
+### 2. Base Paper
+- [A Survey of Data Sanitization Techniques for Secure Storage Media Disposal](https://ieeexplore.ieee.org/document/XXXXXXX)
+- [NIST Special Publication 800-88 Revision 1: Guidelines for Media Sanitization](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-88r1.pdf)
+
+### 3. Existing System
+- Most current data sanitization tools are platform-specific, lack compliance with NIST SP 800-88, or do not provide certificate-based audit trails.
+- Existing open-source tools (e.g., DBAN, nwipe) offer limited reporting and lack modern UI or server integration.
+- Enterprise solutions are often proprietary and expensive, with limited transparency.
+
+### 4. Objectives of the Proposed System
+- Develop a cross-platform, open-source data sanitization tool compliant with NIST SP 800-88 Rev. 1.
+- Support both hardware-based (ATA/NVMe) and software-based (multi-pass) sanitization methods.
+- Provide real-time monitoring, certificate generation, and audit trails.
+- Enable server-based management and reporting for enterprise use.
+- Deliver a modern, user-friendly interface and robust security.
+
+### 5. Proposed Scopus Indexed Journal for Publication
+- *Journal of Information Security and Applications* (Elsevier, Scopus Indexed)
+- *IEEE Access* (Scopus Indexed)
+- *International Journal of Information Security* (Springer, Scopus Indexed)
+
+### 6. Timeline of Project Phases (Elaborated)
+
+| Phase   | Description                                                      | Timeline         | Key Modules/Tasks                                                                                 |
+|---------|------------------------------------------------------------------|------------------|--------------------------------------------------------------------------------------------------|
+| Phase 1 | Requirement Analysis, Literature Survey, System Design           | Jan 2026 - Feb 2026 | - Literature review<br>- Requirement gathering<br>- System architecture design<br>- Technology stack selection<br>- UI/UX wireframes<br>- Database schema design<br>- Project planning & task allocation |
+| Phase 2 | Core Implementation (Desktop App, Sanitization Engine, UI)       | Mar 2026 - Apr 2026 | - Rust project setup<br>- Core sanitization engine (NIST, DoD, Gutmann, ATA/NVMe)<br>- Device detection module<br>- User authentication module<br>- Desktop GUI (egui/eframe)<br>- Certificate/report generation<br>- Local data storage<br>- Unit testing for core modules |
+| Phase 3 | Server Integration, Testing, Documentation, Paper Preparation    | May 2026 - Jun 2026 | - Server backend (Rust + Warp)<br>- REST API development<br>- PostgreSQL integration<br>- Web dashboard (optional)<br>- Integration testing<br>- Deployment scripts<br>- User manual & documentation<br>- Research paper writing<br>- Final review & submission |
+
+---
+
 ## 🚀 Installation & Quick Start
 
 ### 📦 Download Release
@@ -261,6 +294,19 @@ docker run -d -p 3030:3030 --env-file .env hdd-tool-server
 
 ---
 
-**⚠️ Security Notice**: This tool permanently destroys data. Ensure proper backups before use. Always verify compliance requirements for your specific use case.#   X p l o r e A I - O S I N T 
- 
- 
+**⚠️ Security Notice**: This tool permanently destroys data. Ensure proper backups before use. Always verify compliance requirements for your specific use case.
+
+### 🌍 Relevant United Nations Sustainable Development Goals (SDGs)
+
+This project aligns with the following UN SDGs:
+
+- **Goal 9: Industry, Innovation and Infrastructure**  
+  Promotes innovation in secure data destruction and digital infrastructure.
+- **Goal 12: Responsible Consumption and Production**  
+  Encourages responsible disposal and reuse of storage devices by ensuring secure data sanitization.
+- **Goal 16: Peace, Justice and Strong Institutions**  
+  Supports strong institutions by enabling secure data handling, privacy, and compliance with regulations.
+- **Goal 13: Climate Action**  
+  Indirectly supports climate action by enabling safe reuse and recycling of hardware, reducing e-waste.
+
+---
